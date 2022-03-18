@@ -1,0 +1,610 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r include=FALSE, warning = FALSE}
+library(ggplot2)
+library(mctest)
+library(lmtest)
+library(olsrr)
+library(car)
+library(leaps)
+library(MASS)
+library(dplyr)
+library(tidyr)
+library(knitr)
+
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+# Property Value, Community Services, Crime, and Demographics
+## DATA 603 Project
+Adam Hachmi
+
+Zhenyu (Mike) Li
+
+Robin (Scott) Pellegrino
+
+Yue (Flora) Yang
+
+# Introduction
+Having plenty of nutritious food, clean drinking water, and adequate shelter are basic needs every human being requires to survive. It is no wonder then that many Canadians want to live in and own their very own home, however, buying one can be costly and Canadians can spend up to 80% of their income on housing and utilities combined (RBC, 2017). This means buying a house is a major financial decision that cannot be taken lightly; not only does it give one a place to live, but it can also act as an investment for uncertain financial futures ahead. What does all this mean? Buying a home at a great price and at the right time and right place is something all prospective buyers can appreciate.
+
+This report aims to explore the average property value for communities in the City of Calgary and how it is potentially influenced by factors as follows: crime rate (by type of Crime committed), the number of community services (such as clinics, community centres, hospitals, etc.), community sector (north, east, south, west, northwest, etc.) and community demographics (by age and total population).  When analysis was started for this project it was expected that a model with linearity, homoscedasticity, normality, and multicollinearity assumptions would be met and have crime, number of community services, and demographics as strong predictors. More specifically, it was expected that property values would be lowered by the presence of higher crime rates and increased in communities with a higher number of services and a larger population. 
+
+
+# Datasets
+
+To conduct this study, datasets detailing crime, demographics, community services and property assessments within Calgary were needed. Through the Calgary Open Data source, the following datasets were retrieved.
+
+$\bullet \:\ Crime \:\ and \:\ Disorder \:\ Statistics$
+
+$\bullet \:\ Census \:\ By \:\ Community - 2019$
+
+$\bullet \:\ Community \:\ Services$
+
+$\bullet \:\ Property \:\ Assessment$
+
+As stated, each of these datasets were publicly available from the city of Calgary Open Data source and free to use as desired (City of Calgary, 2020). To appropriately utilize the information within each dataset, each was cleaned as follows.
+
+## Crime and Disorder Statistics (City of Calgary, 2018a):
+Entries occurring outside of the year $2019$ were removed. Many of the original variables were not relevant to this study and were therefore removed. The variables which were kept were $Community \:\ name$, $crime \:\ category$, and $Crime \:\ count$. This data was then sorted and grouped by community, producing a table which consisted of crime types as columns and community names as rows, with each element being the number of times a specific crime was recorded in that community.
+
+## Census by Community- 2019 (City of Calgary, 2019):
+As multiple years of information were available, the year 2019 was chosen to allow the study to hold more relevance. When determining which demographic criteria to include, it was found that gender proportions between communities did not vary significantly and therefore only age was included. Ages were grouped into ranges of $0-24$, $25-64$, and $65+$ years old. Once grouped, the data was assigned to a new table where the columns were the defined age groups, the rows were communities and each element was the count of persons in that age range for a community. Additionally, the community classification (Residential, industrial etc.) and sector (North, Northwest, Central, etc.) were also maintained.
+
+## Community Services (City of Calgary, 2016):
+This dataset contained information of each community service facility within the City. This included community centres, court houses, clinics, etc. Due to the relatively low number of facilities, it was decided that the number of facilities per community would be used, as opposed to the different types. Therefore, information from this dataset was extracted into a new table containing the number of services per community.
+
+## Property Assessments (City of Calgary, 2018b):
+Within this dataset was every property assessment completed by the City for the years 2005 to 2020. As only 2019 values were of interest, all other assessments were omitted. Of the remaining data, the community which the property was located, and the assessed value were the only parameters of interest. This data was extracted into a new table and reduced so that each entry was the average property value for a given community.
+
+With each of these datasets managed for the desired varaibles, they were combined into a single table so that each row contained the necessary information for a single community. As a summary, the following lists all variables used in the modelling process.
+
+### Response Variable
+$[1] Property \:\ Value,\:\ (Canadian \:\ Dollars \:\ (CAD))$
+
+### Independent Variables
+
+$[2] - Number \:\ of \:\ Services \:\ (Count)$
+
+$[3] - Community \:\ Classification \:\ (Class)$
+
+$[4] - Community \:\ Sector \:\ (Sector)$
+
+$[5] - Street \:\ Robbery, \:\ Instances \:\ of \:\ Street \:\ Robbery \:\ (Count)$
+
+$[6] - Theft \:\ of \:\ Vehicle, \:\ Instances \:\ of \:\ Theft \:\ of \:\ Vehicle \:\ (Count)$
+
+$[7] - Theft \:\ from \:\ Vehicle, \:\ Instances \:\ of \:\ Theft \:\ from \:\ Vehicle \:\ (Count)$
+
+$[8] - Commercial \:\ Break \:\ \& \:\ Enter, \:\ Instances \:\ of \:\ Commercial \:\ Break \:\ \& \:\ Enter \:\ (Count)$
+
+$[9] - Residential \:\ Break \:\ \& \:\ Enter, \:\ Instances \:\ of \:\ Residential \:\ Break \:\ \& \:\ Enter \:\ (Count)$
+
+$[10] - Assault \:\ (Non-Domestic), \:\ Instances \:\ of \:\ Assault \:\ (Count)$
+
+$[11] - Violence \:\ Other \:\ (Non-Domestic), \:\ Instances \:\ of \:\ Violence \:\ (Count)$
+
+$[12] - Commercial \:\ Robbery, \:\ Instances \:\ of \:\ Commercial \:\ Robbery \:\ (Count)$
+
+$[13] - Physical \:\ Disorder, \:\ Instances \:\ of \:\ Physical \:\ Disorder \:\ (Count)$
+
+$[14] - Social \:\ Disorder, \:\ Instances \:\ of \:\ Social \:\ Disorder \:\ (Count)$
+
+$[15] - Age \:\ 0-24, \:\ Population \:\ Between \:\ Ages \:\ 0 \:\ to \:\ 24 \:\ (Count)$
+
+$[16] - Age \:\ 25-64, \:\ Population \:\ Between \:\ Ages \:\ 25 \:\ to \:\ 64 \:\ (Count)$
+
+$[17] - Age >65, \:\ Population \:\ Above \:\ the \:\ Age \:\ of \:\ 65 \:\ (Count)$
+
+$[18] - Population, \:\ Total \:\ Community \:\ Population \:\ (Count)$
+
+# Methodology
+
+Data for the model variables was cleaned and aggregated using R Studio from the datasets as outlined above into the described combined dataset.Once the relevant variables for the model were loaded available for manipulation, the best fit model was developed and used to make predictions regarding the average property value within a City of Calgary community for the year 2019.
+
+## Modeling Plan
+
+The model for this project was developed using the methods outlined throughout DATA 603 (Ngamkham, 2020) using data from the cleaned dataset $combined.csv$. The data was first tested for outliers. Outlier detection was completed using Cook’s distance and leverage points, with final determination using a Cook's distance, $D_i$, greater than $1$. Prior to elimination, outliers were investigated to determine their validity as well as significance to the future model. Once removed, multiple linear regression methods were employed to fit the remaining data.
+
+As there was significant potential for variables to be related, multicollinearity was tested by computing the variance inflation factor (VIF) and assessing those with high VIF scores ($>5.0$). This method determines the strength of correlation between independent variables and results in a large value when the coefficient of determination between variables,$R^2_{X_j|X_j}$, is large.This is shown within the VIF equation as follows. 
+
+
+$$
+VIF(\hat{\beta}_j) = \frac{1}{1-R^2_{X_j|X_j}}
+$$
+
+For the variables which exhibited VIF values larger than $5$, it was determined that combining them would reduce the significance of the variable and therefore selective variables were removed for future model estimation.
+
+Once multicollinearity was managed, the $Stepwise \:\ Regression$, $Backward \:\ Elimination$, $Forward \:\ Selection$, and $All \:\ Possible \:\ Regression$ procedures were used to collectively determine a best fit first order model. This reduced model was then compared to the full model using a partial F-test (ANOVA table).
+
+As it was likely that each of the above methods would result if a different model estimation, it was decided to use the results of the $All \:\ Possible \:\ Regression$ procedure, and base the model decision off of the Mallow $C_p$ ($C_p$) criterion and Akaike's Information Criterion (AIC). Ideally, the selected model would produce a $C_p$ value of $p+1$, where $p$ is the number of first order predictor variables, as well a low AIC value, relative to other models. Additionally, the other regression procedures were used to support the chosen model, that is, if a specific variable appeared in all models, it was likely a significant predictor.  
+
+With a reduced model containing only statistically significant predictors, the presence of interaction effects and higher order variables was investigated. To verify the inclusion of possible terms, individual t-tests, paired scatter plots, and partial F-tests were conducted.
+
+Once the best fit model was found, the remaining assumptions made to produce the model were tested. Again, these assumptions were:
+
+1.$Variable Independence$
+
+2.$Linearity$
+
+3.$Data \:\  Normality$
+
+4.$Equal \:\ Varience \:\ (Homoscedasticity)$
+
+To determine if the assumptions of Variable independence and linearity hold, a plot of residuals vs fitted data for the best fit model was analyzed. For the data to meet these assumptions, the plot must not show definitive patterns, but also be distributed rougly evenly about the $y=0$ line. 
+
+When investigating data normality, there are several possible methods. In this study, the distribution of residual values, $Q-Q$ plots and the Shapiro-Wilk test were utilized. The distribution or residuals and $Q-Q$ plots provide visual representations from which normality can be qualitatively assessed. The Shapiro-Wilk test uses the residuals of the model to quantitativly determine if the data is significantly normally disributed.
+
+The final assumption to be investigated is the assumption of constant variance, or $homoscedasticity$. This was tested both visually and empirically, using the plot of residuals vs fitted, as well a the Breusch-Pagan test. When analyzing the plot, patterns, groupings, or conical trends indicate the data may not satisfy this assumption. As this only provides a qualitative assessment of the assumption, the Breusch-Pagan test was used to determine, quantitatively, the degree of homoscedasticity within the data.  
+
+Likely, some of these assumptions do not hold for the data. Therefore, should it be necessary, a model transformation will be used. As the assumptions of normailty and homoscedasticty are to be the most violated, the Box-Cox transformation was determined to be the appropriate transform method. This method transforms the response variable by an exponential factor. This factor, $\lambda$ is estimated based on the method of maximum liklihood, and transforms the response variable as follows:
+
+$$
+Y_i^{(\lambda)} = \frac{Y^{\lambda}-1}{\lambda} = \beta_0+\beta_1X_1+...
+$$
+
+Once transformed, each assumption will be re-assessed and the overall validity of the model re-evaluated.
+
+All modeling code can be found within Appendix A.
+
+
+# Results \& Discussion
+
+Prior to investigating the significance of each variable on assessed property value, the data was assessed for outliers. As stated previously, a Cooks distance cut-off of $1$ was used. Three observations were detected and removed from the data, as illustrated within Figure 1 below.
+```{r fig.align='center', out.width = '90%', fig.cap = "Cook's Distance plot identifying outliers."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','cooks.jpg'))
+```
+Next, each variable was assessed for the presence of multicollinearity. This was completed using the VIF method. Investigating the results indicated that there was strong multicollinearity between the three age ranges (age_0, age_25,age_65) and population (pop). This was expected as population was determined by summing each of the age ranges. Removing population as a contributing variable reduced the multicollinearity within the data. Further multicollinearity was observed between age_0 and age_25. As age_25 was believed to be more significant in the model, age_0 was also removed as a contributing variable. With this, no further multicollinearity was observed. The linearity between these 4 variables can be seen illustrated within Figure 2, below 
+
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Pairs plot of Variables with Multicollinearity."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','age_pairs.jpg'))
+```
+
+With the remaining variables, a full first order model was produced. This model include all variables, with the exception of $pop$ and $age_0$, as described above.
+
+As mentioned, several methods were used to estimate which variables were significant in predicting assessed property value. Initially, individual t-test values and a partial F-test method was used to estimate a model. Using an $\alpha$ value of $0.05$, it was found that $Class$,$Assault_{NonDomestic}$,$Age_{25-65}$, and $Social \:\ Disorder$ were the only significant variables. Although some initially exceed $\alpha$ within the full model, when variables were removed, their significance became relevant. To validate the removal of variables, the Partial F-test was used, producing the following hypotheses.
+
+$$
+H_0: The \:\ removed \:\ variables \:\ are \:\ not \:\ significant \:\ in \:\ the \:\ model \:\ estimation, \:\ \beta_i =\beta_j =0
+$$
+$$
+H_A: At \:\ least \:\ one \:\ of \:\ the \:\ removed \:\ variables \:\ is \:\ significant \:\ in \:\ the \:\ model \:\ estimation,  \:\ at \:\ least \:\  one \:\ \beta_i \neq 0
+$$
+Completing the Partial F-test resulted in an F-statistic of $0.5375$ and a p-value of $0.9277$. This indicates that the null hypothesis is to be accepted, supporting that the removed variables are not likely to be significant when estimating property value. This model produced an adjusted coefficient of determination ($R^2_{adj}$) of $0.6558$, and and error (RMSE) of $\$1,122,000$. Given the data, this $R^2_{adj}$ was somewhat larger that expected, and indicated that a measurable relationship may be estimated should assumptions hold. However; the magnitude of the RMSE value was unsettling as it is almost three times as large as some homes. This provided motivation to determine alternate improved models.   
+
+
+The next regression method utilized were the stepwise, forwards, and backwards regression methods. As the names suggests, these methods step through each variable to determine the variables which meet criteria and are to be kept. First, the results of the stepwise method determined that only $Social \:\ Disorder$, $Violence_{Other}$, $Class$, and $Age_{(25-65)}$ were significant estimators. This model produced an $R^2_{adj}$ of $0.6559$, and an RMSE of $\$1,122,000$. Similarly, the forward regression model determined that the variables $Social \:\ Disorder$, $Violence_{Other}$, $Class$, and $Age_{(25-65)}$ were significant. Therefore, this model produced the same $R^2_{adj}$ and RMSE values. The backwards regression found that the variables $Social \:\ Disorder$, $Assault_{NonDomestic}$, $Class$, and $Age_{(25-65)}$ were significant when estimating property value. This model produced $R^2_{adj}$ and RMSE values of $0.6558$ and $\$1,122,000$ respectively.
+
+The final regression method utilized was the $all \:\ possible \:\ subsets$ method. Figure 3, below, illustrates the change of Mallows $C_p$ criterion, Akaike's Information Criterion (AIC), and both adjusted and non-adjusted coefficients of determination, $R^2$, with models of an increasing number of variables. It was decided that the model consisting of the 4 best fitting variables would be utilized for further fitting. This model was chosen based on the relatively low $C_p$ value of $-3.8849$, and AIC value of $3906.6$. Due to the negative $C_p$ value, more weight was given to the AIC value when deciding the best fit model, as the available smaller $C_p$ values would introduce more bias due to overfitting. It was also found that this model had the largest $R^2_{adj}$ value of $0.6559$, further supporting the decision to move forward with it as the best fit model. This model determined that the variables $Class$, $Social \:\ Disorder$, $violence_{Other}$, and $Age_{(25-65)}$ were significant. As this is the same model as the stepwise and forward regression model, the $R^2_{adj}$ and RMSE values were, again, $0.6559$ and $\$1,122,000$ respectively. Verifying these results with a partial F-test, the same hypotheses as above were tested, finding a p-value of $0.9285$, supporting the appropriateness of determined model as the null hypothesis, $H_0$, is to be accepted. Therefore, the first order regression model is as follows.
+
+
+$$
+\hat{Value} = 97,204 \times Violence_{Other}-1,436,189 \times Social \:\ Disorder -164 \times Age_{(25-65)}+\phi
+$$
+where
+$$
+\phi =
+\begin{cases}
+  20,231,316 & if \:\ Class = Industrial \\
+  22,385,987 & if \:\ Class = Major \:\ Park \\
+  18,000,327 & if \:\ Class = Residential \\
+  \end{cases}
+$$
+
+```{r cp_AIC, fig.align='center', out.width = '90%', fig.cap = "$C_p$, AIC, $R^2$ and $R^2_{Adj}$ values of all possible regression."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','cp_AIC.jpg'))
+```
+
+
+
+As the model chosen had a $C_p$ value significantly lower than the ideal $p+1$ value, $-3.9$ vs. $~5$, it is likely that the model introduces a measurable amount of bias into the property value estimation. Additionally, due to the large number of t-tests conducted in this method, there is a likelihood that type I error was introduced into the model.
+
+The regression coefficients in this model are somewhat unexpected. It was thought that an increase of any crime type would decrease the property value, however it can be seen that an increase of Violence appears to also increase property value, if all else is held constant. Additionally, a larger number of working aged persons (Aged 25-65) appears to also decrease the property value, which is somewhat unexpected. A trend which was expected was that properties within areas classified as parks had a higher value than industrial and residential. Further, a residential classification will have a lower value than both industrial and major park, if all else is held constant.
+
+In attempts to improve the fit of the model further, the interaction effects between each variable were investigated. Again, using an $\alpha$ value of $0.05$, it was found that $Class$ and $Social \:\ Disorder$, and $Class$ and $Violence_{NonDomestic}$ had statistically significant interaction effects. Verifying the results against a model containing all possible interaction terms, an F-statisic and p-value of $0.379$ and $0.6854$, respectively, were determined. These values suggest that we fail to reject the following null hypothesis, $H_0$, indicating that the retained interaction terms are appropriate.
+
+$$
+H_0: The \:\ excluded \:\ interaction \:\ terms \:\ are \:\ not \:\ significant \:\ in \:\ the \:\ model \:\ estimation, \:\ \beta_i =\beta_j =0
+$$
+$$
+H_A: At \:\ least \:\ one \:\ of \:\ the \:\ excluded \:\ intercation \:\ terms \:\ is \:\ significant \:\ in \:\ the \:\ model \:\ estimation,  \:\ at \:\ least \:\  one \:\ \beta_i \neq 0
+$$
+
+With these interaction terms, the updated regression model becomes:
+
+$$
+\hat{Value} = 601,057 \times Violence_{Other}+575,389 \times Social \:\ Disorder -141 \times Age_{(25-65)}+\phi
+$$
+where:
+$$
+\phi=
+\begin{cases}
+  -3,993,516 & if \:\ Class = Industrial \\
+  \:\:\ 30,019,518-2,701,952\times Social \:\ Disorder -3,383,610 \times Violence_{other} & if \:\ Class = Major \:\ Park \\
+  -153,792-479,214\times Social \:\ Disorder-565,410 \times Violence_{Other} & if \:\ Class = Residential \\
+  \end{cases}
+$$
+Investigating higher order terms, using the "$pairs$" plots, no concavity was observed, as is shown in Figure 4 below. Therefore, no higher order terms were included in the model estimation. As a result, the above estimation was determined to be the best fit model for the data. This model produced an $R^2_{adj}$ of $0.8494$, and an RMSE of $\$742,200$. Compared to the first order model, including the interaction terms produced an evident improvement. Examining the regression coefficients, the expected influence appears to be more appropriate. It can be seen that occurrences of crimes have less of an impact on industrial classified areas. This may be a result of city zoning and the limited number of areas industrial facilities may be constructed. It can also be seen that crime occurrences have the most influence on the value of major park classifications. This seems rational as it is believed that the value of parks would be tied to how likely individuals are to frequent it, and fewer people are going to go spend time where many crimes are committed. However, this is purely speculation.
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Paired scatter plots used to determine if higher order terms are necessary."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','ho_pairs.jpg'))
+```
+
+
+For the model estimation to hold any significance, the assumptions made when producing the model must be assessed. As stated, these assumptions are $Variable \:\ Independence$, $Linearity$, $Normality$, $No \:\ Multicollinearity$, and $Homoscedasticity$. As values within the data are not time dependent, each value corresponds to the entire year, it can be assumed that the variables are independent. As has been shown previously, multicollinearity has been addressed and managed. This leaves the assumptions of $Linearity$, $Normality$ and $Homoscedasticity$ to be investigated. As can be seen in the residuals vs fitted plot, shown in Figure 5, the data appears to rest around the $y=0$ line. The red line illustrates that the data appears to be sufficiently linear. To investigate the assumption of normality, a histogram, Q-Q plot, and the Shapiro-Wilk test were used. First observing the distribution of the residuals, shown as Figure 6, it can be seen that the values appear mostly normal, although there are points which are seen to fall at extreme values outside of the majority. The $Q-Q$ plot, shown as Figure 7, further supports these observations. The majority of points follow the diagonal linear, with some "extreme" points on each end. Finally, the Shaprio-Wilk test statistically quantifies the normality of residuals within the data using the following hypotheses. 
+
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Plot of residuals vs fitted data to visualize linearity and Homoscedasticity."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','resid_plot.jpg'))
+```
+
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Histogram illustrating the distribution of the residuals."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','resid_hist.jpg'))
+```
+
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Q-Q plot illustrating normality within the data."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','qq_plot.jpg'))
+```
+
+
+$$
+H_0: The \:\ data\:\ is\:\ significantly\:\ normally\:\ distributed.
+$$
+$$
+H_A: The \:\ data\:\ is\:\ \textbf{NOT} \:\ significantly\:\ normally\:\ distributed.
+$$
+From conducting the Shapiro-Wilk test, a p-value of $<2.2e-16$ was found. From this value, the null hypothesis, $H_0$ is to be rejected in favor of the alternative, $H_A$. This suggests that the data is not significantly normally distributed, and the normality assumption does not hold. 
+
+Turning to the assumption of homoscedasticity, the variance of the error terms is assumed to have constant variance. Returning to the residuals plot, Figure 5, no discernible pattern, nor "cone" is visible. Additionally, the point appear to be distributed fairly evenly about $y=0$. To test for homoscedasticity, or the presence of heteroscedasticty, the Breusch-Pagan test was utilized. This test utilized statistical parameters of the model ($\chi^2 test$) to determine if homoscedasticity is present. The results of the Breusch-Pagan test are used to evaluate the following hypotheses.
+
+$$
+H_0: Heteroscedasticiy \:\ is \:\ not \:\ present \:\ in \:\ the \:\ model, \:\ the \:\ data \:\ is \:\ homoscedastic, \:\ \sigma^2_i = \sigma^2_j = \sigma^2_k
+$$
+$$
+H_A: Heteroscedasticiy \:\ is \:\ present \:\ in \:\ the \:\ model, \:\ the \:\ data \:\ is \:\ \textbf{NOT} \:\ homoscedastic, \:\ at \:\ least \:\ one \:\  \sigma^2_i \neq \sigma^2_j
+$$
+
+From conducting the test on the best fit model, a p-value of $0.01197$ was determined. As this is less than the pre-defined $\alpha$ value of $0.05$, the null hypothesis, $H_0$, is rejected in favor of the alternative, $H_A$, implying that the data is not homoscedastic, and the assumption does not hold. 
+
+Based on these results, it is not possible to claim the the estimated best fit model indeed fits the data. In attempts to remedy these assumption shortcomings, a transformation of the response variable was conducted. As the assumptions of homoscedasticy and normality are the most significantly broken, the Box-Cox transformation was employed. It is reasonable to utilize this method as all values of the response variable (assessed value) are greater than $0$. It was found that a transformation power, $\lambda$, of $-0.73232$ was most suitable for the fitted data. The plot illustrating maximum likelihood is show as Figure 8. Applying the Box-Cox transformation, the transformed regression model was determined to be:
+
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Box-Cox Maximum likelihood $\\lambda$ value estimation."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','box_cox.jpg'))
+```
+
+$$
+\hat{Value}^{-0.73232} = 2.266e-6 \times Violence_{Other}+6.677e-6 \times Social \:\ Disorder -5.290e-9 \times Age_{(25-65)}+\phi
+$$
+ where:
+$$
+\phi =
+\begin{cases}
+  1.365 & if \:\ Class = Industrial \\
+  1.365-8.067e-6\times Social \:\ Disorder -2.416e-5\times Violence_{other} & if \:\ Class = Major \:\ Park \\
+  1.365-4.578e-6  \times Social \:\ Disorder-2.717e-6 \times Violence_{Other} & if \:\ Class = Residential \\
+  \end{cases}
+$$
+
+This model produced an $R^2_{adj}$ of $0.4693$, and RMSE of $2.094e-5$. Compared to the non-transformed model, this $R^2_{adj}$ appears inferior. To determine if the decreased $R^2_{adj}$ value has worth, the assumptions must be re-evaluated. As the Box-Cox transform is intended to primarily alter the status of homoscedasticity and normalily, these two conditions were re-investigated. As other changes may occur within the data during the transform, linearity was also checked. From the residuals plot presented in Figure 9, it can be seen that the residuals are more dispersed, compared to the non-transformed model. From the plot, it is difficult to determine if the change in linearity is an improvement over the non-transformed model.
+
+```{r fig.align='center', out.width = '90%', fig.cap = "Plot of transformed residuals vs fitted data to visualize linearity and Homoscedasticity."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','resid_trans.jpg'))
+```
+```{r fig.align='center', out.width = '90%', fig.cap = "Histogramillustrating the distribution of transformed residuals."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','resid_hist_trans.jpg'))
+```
+```{r fig.align='center', out.width = '90%', fig.cap = "Q-Q plot illustrating normality within the transformed data."}
+knitr::include_graphics(here::here('G:/DATA 603/Figures','qq_trans.jpg'))
+```
+
+
+
+Inspecting the residual distribution and $Q-Q$ plot, presented as Figures 10 and 11, there appears to be a noticeable improvement in terms of normality. The Shapiro-Wilk results, however, return a p-value of $0.04604$. With the same normality hypotheses of
+
+$$
+H_0: The \:\ data\:\ is\:\ significantly\:\ normally\:\ distributed.
+$$
+$$
+H_A: The \:\ data\:\ is\:\ \textbf{NOT} \:\ significantly\:\ normally\:\ distributed.
+$$
+
+it is determined that the Alternate hypothesis, $H_A$, is, again, favorable over the null, $H_0$. While the change is improved, the normality of the transformed data remains slightly below the level of significance. 
+
+
+The final assumption to verify is the homoscedasticty. Using the same method as previously described, the Breusch-Pagan test produced a p-value of $0.4267$. Again, using the same hypotheses, stated as:
+
+$$
+H_0: Heteroscedasticiy \:\ is \:\ not \:\ present \:\ in \:\ the \:\ model, \:\ the \:\ data \:\ is \:\ homoscedastic, \:\ \sigma^2_i = \sigma^2_j = \sigma^2_k
+$$
+$$
+H_A: Heteroscedasticiy \:\ is \:\ present \:\ in \:\ the \:\ model, \:\ the \:\ data \:\ is \:\ \textbf{NOT} \:\ homoscedastic, \:\ at \:\ least \:\ one \:\  \sigma^2_i \neq \sigma^2_j
+$$
+
+it is possible to claim that the data is homoscedastic. Due to the p-value surpassing the $\alpha$ of $0.05$, the null hypothesis is to be accepted. With this, the assumption of homoscedasticity holds for the transformed data.  
+
+It is clear that this transform method aids in satisfying some assumptions. While the $R^2_{adj}$ for the transformed model is considerably lower than the original best fit model, It is believed to be more accurate for the data as assumptions are improved. While the normality is not definitively changed, the homoscedasticty is. Additionally, it was not expected to find a model with a perfect fit. It is believed that the variety of assessed property types contributed to the data irregularity. 
+To improve the model, conducting additional outlier analyses may be useful. One potential drawback with this is it may be difficult to determine where to stop, potentially removing points which should not be removed. To improve the relevance of the model, only certain property or community types could be analyzed. For example, the majority of homes in Calgary are within the range of $300-500$ thousand dollars. By using only homes, or residential properties, many of the significantly more expensive facilities, such as hospitals, would not interfere, proving a potentially more accurate model at predicting a house price. 
+
+# Conclusion
+This study found that of the available predictor variables, only the number of social disorders, non-domestic violent crimes, persons aged 25 to 65, and community classification were significant when estimating assessed property value. An all possible regression method was used to determine the best estimate model. This model was selected primarily on the AIC value, and secondly on $C_p$ value. It was fount that interaction effects were present between community class and the number of social disorders, and community class and the number of non-domestic violent crimes. No higher order terms were found to be significant. Therfore the best fit model was determined to be:
+$$
+\hat{Value} = 601,057 \times Violence_{Other}+575,389 \times Social \:\ Disorder -141 \times Age_{(25-65)}+\phi
+$$
+where:
+$$
+\phi=
+\begin{cases}
+  -3,993,516 & if \:\ Class = Industrial \\
+  \:\:\ 30,019,518-2,701,952\times Social \:\ Disorder -3,383,610 \times Violence_{other} & if \:\ Class = Major \:\ Park \\
+  -153,792-479,214\times Social \:\ Disorder-565,410 \times Violence_{Other} & if \:\ Class = Residential \\
+  \end{cases}
+$$
+
+This determined best fit model produced an $R^2_{adj}$ value of $0.8494$, and an RMSE of $\$742,200$. When verifying the regression assumptions, it was found that the assumptions of normality and homoscedasticity were not satisfied. Performing a Box-Cox transformation on the response variable was completed in attempts to remedy these violations. After transformation, the assumption of homoscedasticty became satisfied, however, the assumption of normality remained un-satisfied. This transformed model was determined to be:
+
+$$
+\hat{Value}^{-0.73232} = 2.266e-6 \times Violence_{Other}+6.677e-6 \times Social \:\ Disorder -5.290e-9 \times Age_{(25-65)}+\phi
+$$
+ where:
+$$
+\phi =
+\begin{cases}
+  1.365 & if \:\ Class = Industrial \\
+  1.365-8.067e-6\times Social \:\ Disorder -2.416e-5\times Violence_{other} & if \:\ Class = Major \:\ Park \\
+  1.365-4.578e-6  \times Social \:\ Disorder-2.717e-6 \times Violence_{Other} & if \:\ Class = Residential \\
+  \end{cases}
+$$
+
+Compared to the best fit model, the transformed model produced a lower $R^2_{adj}$ value of $0.4693$. Although the best fit model produced a larger $R^2_{adj}$, due to the assumption violations, it is not justifiable to state that it is a superior model. Generally, both these models indicate that an increase in crime rates will reduce property value, with the exception of communities classified as industrial. Ultimately, both models are not likely to produce overly meaningful results. Further investigation should be conducted, potentially isolating property type, and conducting a more rigorous outlier detection.      
+
+# References
+
+Royal Bank of Canada (RBC), 2017, \textit{Housing Trends and Affordability}, RBC Economics | Research, Copyright: Royal Bank of Canada, retrieved from: http://www.rbc.com/economics/economic-reports/pdf/canadian-housing/house-jun2017.pdf
+
+City of Calgary, 2020, Open Government Licence - City of Calgary, accessed on 03-11-2020, available at:https://data.calgary.ca/stories/s/Open-Calgary-Terms-of-Use/u45n-7awa
+
+City of Calgary, 2018a, Community Crime and Disorder Statistics(to be archived), accessed on 24-11-2020, available at: https://data.calgary.ca/Health-and-Safety/Community-Crime-and-Disorder-Statistics-to-be-arch/848s-4m4zhttps://data.calgary.ca/Health-and-Safety/Community-Crime-and-Disorder-Statistics-to-be-arch/848s-4m4z
+
+City of Calgary, 2019, census by community 2019, accessed on 3-11-2020, available at:
+https://data.calgary.ca/Demographics/Census-by-Community-2019/rkfr-buzb 
+
+City of Calgary, 2016, Community services, accessed on 3-11-2020, available at:
+https://data.calgary.ca/Services-and-Amenities/Community-Services/x34e-bcjz
+
+City of Calgary, 2018b, Property Assessments, accessed on 2-11-2020, available at: https://data.calgary.ca/dataset/Property-Assessments/6zp6-pxei  
+
+T. Ngamkham, 2020, DATA 603 Course Notes, \textit{Mutliple Linear Regression Part 1, 2, 3, 4}, Accessed from D2L content boards
+
+
+# Appendix A
+
+## R Code
+
+
+
+```{r}
+knitr::opts_chunk$set(echo=TRUE)
+```
+
+```{r}
+data = read.csv('G:/DATA 603/Project/Data/combined.csv')
+head(data,4)
+w=600
+h=400
+```
+
+
+```{r}
+model = lm(val~n_serv+factor(CLASS)+factor(SECTOR)+Street.Robbery+
+             Theft.OF.Vehicle+Theft.FROM.Vehicle+Commercial.Break...Enter+
+             Social.Disorder+Assault..Non.domestic.+Residential.Break...Enter+
+             Physical.Disorder+Violence.Other..Non.domestic.+Commercial.Robbery+
+             age_0+age_25+age_65+pop,data)
+```
+
+### Remove outliers
+
+```{r}
+lev=hatvalues(model)
+p = length(coef(model))
+n = nrow(data)
+outlier = lev[lev>(3*p/n)]
+print(outlier)
+plot(rownames(data),lev, main = "Leverage in Dataset", xlab="observation",
+     ylab = "Leverage Value")
+abline(h = 2 *p/n, lty = 1)
+abline(h = 3 *p/n, lty = 1)
+
+jpeg('Cooks.jpg',width =w,height=h)
+plot(model, which=4)
+abline(h=1,col='red')
+dev.off()
+
+plot(model, which=4)
+abline(h=1,col='red')
+
+out_data = data[cooks.distance(model)<1,]
+
+model = lm(val~n_serv+factor(CLASS)+factor(SECTOR)+Street.Robbery+Theft.OF.Vehicle+
+             Theft.FROM.Vehicle+Commercial.Break...Enter+Social.Disorder+
+             Assault..Non.domestic.+Residential.Break...Enter+
+             Physical.Disorder+Violence.Other..Non.domestic.+Commercial.Robbery+
+             age_0+age_25+age_65+pop,out_data)
+summary(model)
+```
+
+### check multicollinearity:
+
+```{r}
+imcdiag(model,method = 'VIF')
+model = lm(val~n_serv+factor(CLASS)+factor(SECTOR)+Street.Robbery+Theft.OF.Vehicle+
+             Theft.FROM.Vehicle+Commercial.Break...Enter+Social.Disorder+
+             Assault..Non.domestic.+Residential.Break...Enter+Physical.Disorder+
+             Violence.Other..Non.domestic.+Commercial.Robbery+age_0+age_25+
+             age_65,out_data)
+imcdiag(model,method = 'VIF')
+model = lm(val~n_serv+factor(CLASS)+factor(SECTOR)+Street.Robbery+Theft.OF.Vehicle+
+             Theft.FROM.Vehicle+Commercial.Break...Enter+Social.Disorder+
+             Assault..Non.domestic.+Residential.Break...Enter+Physical.Disorder+
+             Violence.Other..Non.domestic.+Commercial.Robbery+age_25+
+             age_65,out_data)
+imcdiag(model,method = 'VIF')
+summary(model)
+red_model = lm(val~factor(CLASS)+Social.Disorder+Assault..Non.domestic.+age_25,out_data)
+summary(red_model)
+anova(red_model, model)
+
+jpeg('age_pairs.jpg',width =w, height = h)
+pairs(~age_0+age_25+age_65+pop,out_data)
+dev.off()
+```
+
+```{r}
+step_model = ols_step_both_p(model,pent=0.05, prem = 0.1)
+summary(step_model$model)
+step_forw = ols_step_forward_p(model, pent=0.1)
+summary(step_forw$model)
+step_back = ols_step_backward_p(model, prem=0.1)
+summary(step_back$model)
+
+ks1 = ols_step_best_subset(model, details= T)
+ks1
+
+jpeg('cp_AIC.jpg',heigh = h,width=w)
+par(mfrow=c(2,2))
+plot(ks1$cp,type = "o",pch=10, xlab="Number of Variables",ylab= "Cp")
+plot(ks1$rsq,type = "o",pch=10, xlab="Number of Variables",ylab= "R^2")
+plot(ks1$aic,type = "o",pch=10, xlab="Number of Variables",ylab= "AIC")
+plot(ks1$adjr,type = "o",pch=10, xlab="Number of Variables",ylab= "Adjusted R^2")
+dev.off()
+```
+### Best Model
+```{r}
+best_first_model = lm(val~factor(CLASS)+Social.Disorder+Violence.Other..Non.domestic.+
+                        age_25,out_data)
+summary(best_first_model)
+```
+### anova test
+```{r}
+anova(best_first_model,model)
+```
+
+### interaction
+```{r}
+int_model = lm(val~(factor(CLASS)+Social.Disorder+Violence.Other..Non.domestic.+
+                      age_25)^2,out_data)
+summary(int_model)
+
+best_int = lm(val~factor(CLASS)+Social.Disorder+Violence.Other..Non.domestic.+
+                age_25+factor(CLASS)*Social.Disorder+
+                factor(CLASS)*Violence.Other..Non.domestic.,out_data)
+summary(best_int)
+
+anova(int_model, best_int)
+```
+
+### Higher Order
+```{r}
+jpeg('ho_pairs.jpg',height =h,width=w)
+pairs(val~factor(CLASS)+Social.Disorder+Violence.Other..Non.domestic.+
+        age_25,out_data,panel=panel.smooth)
+dev.off()
+# nothing significant, no higher orders
+
+higher_order = lm(val~factor(CLASS)+Social.Disorder+Violence.Other..Non.domestic.+
+                    age_25+factor(CLASS)*Social.Disorder+
+                    factor(CLASS)*Violence.Other..Non.domestic.+
+                    I(Violence.Other..Non.domestic.)^2,out_data)
+summary(higher_order)
+
+anova(best_int,higher_order)
+```
+
+### Check assumptions
+```{r}
+# linearity:
+jpeg('resid_plot.jpg',height =h, width =w)
+plot(best_int, which = 1)
+dev.off()
+
+#Normality
+jpeg('resid_hist.jpg',height =h, width =w)
+ggplot(out_data,aes(residuals(best_int)))+geom_histogram(col='red',fill='blue')+
+  ggtitle('Distribution of Residuals of the Best Fit Interaction Model')+labs(x='Residuals',y='Count')
+dev.off()
+
+jpeg('qq_plot.jpg',height =h, width =w)
+plot(best_int, which=2)
+dev.off()
+shapiro.test(residuals(best_int))
+
+#heteroscedasticity
+bptest(best_int)
+```
+
+### Transform
+```{r}
+jpeg('box_cox.jpg',height = h, width =w)
+bc = boxcox(best_int,lambda = seq(-1.5,0.5))
+dev.off()
+
+best_lam = bc$x[which(bc$y==max(bc$y))]
+best_lam
+#best_lam = -0.73232
+
+bc_best_model = lm((((val^best_lam)-1)/best_lam)~factor(CLASS)+Social.Disorder+
+                     Violence.Other..Non.domestic.+age_25+factor(CLASS)*Social.Disorder+
+                     factor(CLASS)*Violence.Other..Non.domestic.,out_data)
+summary(bc_best_model)
+```
+### Re-check assumptions
+```{r}
+# linearity:
+jpeg('resid_trans.jpg',height=h,width=w)
+plot(bc_best_model, which = 1)
+dev.off()
+
+#Normality
+shapiro.test(residuals(bc_best_model))
+jpeg('resid_hist_trans.jpg',height=h,width=w)
+ggplot(out_data,aes(residuals(bc_best_model)))+geom_histogram(col='red',fill='blue')+
+  ggtitle('Distribution of Residuals of the Transformed Best Fit Interaction Model')+
+  labs(x='Residuals',y='Count')
+dev.off()
+jpeg('qq_trans.jpg',height=h,width=w)
+plot(bc_best_model, which=2)
+dev.off()
+
+#heteroscedasticity
+bptest(bc_best_model)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
